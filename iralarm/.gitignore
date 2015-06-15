@@ -1,0 +1,6 @@
+/iralarmd
+/iralarmctl
+/test
+*.swp
+*.o
+*.d
