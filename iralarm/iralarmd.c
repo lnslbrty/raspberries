@@ -261,18 +261,22 @@ void
 irxmpp_thrd_callback(int id) {
   char *buf;
   int ret;
+  struct tm tm;
 
   switch (id) {
     case IRXMPP_STATUS:
       semop(sem_id, &sops[0], 1);
+      tm = *localtime(&ir_alrm_start);
       ret = asprintf(&buf, "\n[STATUS]\n"
                            "state.........: %d\n"
                            "recvd.........: %lu\n"
                            "recvd_cycls...: %lu\n"
                            "alarm_cycls...: %lu\n"
+                           "last_alarm....: %04d-%02d-%02d %02d:%02d:%02d\n"
                          , astate, (long unsigned int) ir_recvd
                                  , (long unsigned int) ir_recvd_cycls
-                                 , (long unsigned int) ir_alrm_cycls);
+                                 , (long unsigned int) ir_alrm_cycls
+                                 , tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
       if (ret >= 0) {
         irxmpp_sendmsg_trusted(buf);
         free(buf);

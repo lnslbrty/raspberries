@@ -1,5 +1,6 @@
 /iralarmd
 /iralarmctl
+/iralarmshell
 /test
 *.swp
 *.o

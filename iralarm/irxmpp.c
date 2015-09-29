@@ -431,8 +431,8 @@ __irxmpp_conn_handler(xmpp_conn_t * const conn, const xmpp_conn_event_t status,
     xmpp_send(conn, pres);
     xmpp_stanza_release(pres);
     pthread_cond_signal(&thrd_conn_cond);
-  } else {
-    xmpp_stop(ctx);
+  } else if (status == XMPP_CONN_DISCONNECT) {
+    log("irxmpp: disconnected (error: %d)", error);
   }
 }
 
@@ -457,12 +457,17 @@ __irxmpp_connect(void)
   do_reconnect = 1;
   do {
     /* initiate connection */
+    log("%s", "irxmpp: connecting..");
     if ( xmpp_connect_client(conn, host, port, __irxmpp_conn_handler, ctx) != 0 ) {
       sleep(2);
-      continue;
+    } else {
+      xmpp_run(ctx);
+      log("%s", "irxmpp: connection lost");
+      xmpp_disconnect(conn);
+      sleep(2);
     }
-    xmpp_run(ctx);
   } while (do_reconnect != 0);
+  log("%s", "irxmpp: going down");
   pthread_mutex_unlock(&thrd_conn_mtx);
   return 0;
 }
@@ -479,7 +484,7 @@ irxmpp_stopThread(void)
   int *intp;
 
   do_reconnect = 0;
-  xmpp_disconnect(conn);
+  xmpp_stop(ctx);
   pthread_join(thrd, (void **) &intp);
   /* release our connection and context */
   xmpp_conn_release(conn);

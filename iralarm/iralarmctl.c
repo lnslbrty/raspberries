@@ -106,26 +106,58 @@ do_set(int id, void *ptr, void *valuep)
 #else
 #define ir_strstr(b, s) strstr(b, s)
 #endif
+#define SHELL_DELIM " "
+#define SHELL_CMDLEN 255
+#define SHELL_ARGLEN 128
+static int
+shell_getarg(char *buf, char argarr[][SHELL_ARGLEN], int nargs)
+{
+  char *s;
+  int argidx = 0;
+
+  s = strtok(buf, SHELL_DELIM);
+  while ( s != NULL && (s = strtok(NULL, SHELL_DELIM)) ) {
+    memset( (void *) &argarr[argidx][0], '\0', SHELL_ARGLEN );
+    strncpy( (char *) &argarr[argidx][0], s, SHELL_ARGLEN );
+    argidx++;
+    if ( --nargs == 0 ) {
+      return nargs;
+    }
+  }
+  return -1;
+}
+
 static void
 do_shell(void)
 {
-  char buf[17];
+  static char buf[SHELL_CMDLEN+1];
   ssize_t nread;
 
   setbuf(stdout, NULL);
   printf("> ");
-  while ( (nread = read(0, (char *) buf, 16)) > 0 ) {
-    buf[16] = '\0';
-    if ( ir_strstr(buf, "GET\n") == buf ) {
-    } else if ( ir_strstr(buf, "SET\n") == buf ) {
-    } else if ( ir_strstr(buf, "SHOW\n") == buf ) {
+  while ( (nread = read(0, (char *) buf, SHELL_CMDLEN)) > 0 ) {
+    if (buf[nread-1] == '\n') buf[nread-1] = '\0';
+    if ( ir_strstr(buf, "GET") == buf ) {
+      char g_args[1][SHELL_ARGLEN];
+      if ( shell_getarg(buf, g_args, 1) != -1 ) {
+printf("*%s*\n", g_args[0]);
+      }
+    } else if ( ir_strstr(buf, "SET") == buf ) {
+      char g_args[2][SHELL_ARGLEN];
+      if ( shell_getarg(buf, g_args, 2) != -1 ) {
+printf("*%s*\n", g_args[0]);
+printf("*%s*\n", g_args[1]);
+      }
+    } else if ( ir_strstr(buf, "SHOW") == buf ) {
       do_all();
     } else if ( ir_strstr(buf, "HELP") == buf ) {
       printf("GET, SET, SHOW, HELP\n");
     } else {
-      printf("UNKNOWN CMD\n");
+      printf("UNKNOWN CMD; TYPE 'HELP' FOR MORE INFORMATION\n");
     }
+
     printf("> ");
+    memset(buf, '\0', SHELL_CMDLEN+1);
   }
 }
 
@@ -143,6 +175,13 @@ str2int(char *buf, unsigned long int *dst)
   return 0;
 }
 
+static char *
+my_basename(char *path)
+{
+  char *tmp = strrchr(path, '/');
+  return (tmp != NULL ? tmp + 1 : path);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -152,35 +191,40 @@ main(int argc, char **argv)
   int value_set = 0, value_inval = 0;
   unsigned long int shmi = 0, value = 0;
   enum ctlopt copt = NONE;
+  char *basename;
 
-  if (argc == 1) {
-    usage(argv[0]);
-    exit(1);
-  }
+  if ( (basename = my_basename(argv[0])) != NULL && strstr(basename, "shell") ) {
+    copt = SHELL;
+  } else {
+    if (argc == 1) {
+      usage(argv[0]);
+      exit(1);
+    }
 
-  while ((opt = getopt(argc, argv, "ag:s:v:e")) != -1) {
-    switch (opt) {
-      case 'a':
-        copt = ALL;
-        break;
-      case 'g':
-        copt = GET;
-        value_inval |= str2int(optarg, &shmi);
-        break;
-      case 's':
-        copt = SET;
-        value_inval |= str2int(optarg, &shmi);
-        break;
-      case 'v':
-        value_inval |= str2int(optarg, &value);
-        value_set = 1;
-        break;
-      case 'e':
-        copt = SHELL;
-        break;
-      default:
-        usage(argv[0]);
-        exit(EXIT_FAILURE);
+    while ((opt = getopt(argc, argv, "ag:s:v:e")) != -1) {
+      switch (opt) {
+        case 'a':
+          copt = ALL;
+          break;
+        case 'g':
+          copt = GET;
+          value_inval |= str2int(optarg, &shmi);
+          break;
+        case 's':
+          copt = SET;
+          value_inval |= str2int(optarg, &shmi);
+          break;
+        case 'v':
+          value_inval |= str2int(optarg, &value);
+          value_set = 1;
+          break;
+        case 'e':
+          copt = SHELL;
+          break;
+        default:
+          usage(argv[0]);
+          exit(EXIT_FAILURE);
+      }
     }
   }
 

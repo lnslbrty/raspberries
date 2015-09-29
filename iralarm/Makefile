@@ -15,6 +15,7 @@ OBJECTS=$(patsubst %.c, %.o, $(SOURCES))
 DEPS=$(patsubst %.c, %.d, $(SOURCES))
 ELFBIN=iralarmd
 CTLBIN=iralarmctl
+SHBIN=iralarmshell
 TESTBIN=test
 
 
@@ -23,7 +24,7 @@ all: $(OBJECTS) $(ELFBIN) $(CTLBIN) $(TESTBIN)
 clean:
 	-$(RM) $(OBJECTS)
 	-$(RM) $(DEPS)
-	-$(RM) $(ELFBIN) $(CTLBIN)
+	-$(RM) $(ELFBIN) $(CTLBIN) $(SHBIN)
 	-$(RM) $(TESTBIN)
 
 %.o: %.c
@@ -40,7 +41,10 @@ $(ELFBIN): irxmpp.o irpio.o irthread.o irshmem.o iralarmd.o
 
 $(CTLBIN): irshmem.o iralarmctl.o
 	$(CC) -L$(WLIBDIR) $(LDFLAGS) $+ -o $(CTLBIN)
+	[ -x $(SHBIN) ] || ln -s $(CTLBIN) $(SHBIN)
 	chmod +x $(CTLBIN)
+
+rebuild: clean all
 
 install: $(ELFBIN) $(CTLBIN)
 	cp ./$(ELFBIN) $(DESTDIR)/sbin/$(ELFBIN)
