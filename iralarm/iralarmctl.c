@@ -23,6 +23,20 @@ static int sem_id;
 static struct sembuf sops[2] = { { 0, -1, 0 }, { 0,  1, 0 } };
 
 
+static int
+str2int(char *buf, unsigned long int *dst)
+{
+  char *tmp;
+  unsigned long int val;
+
+  val = strtoul(buf, &tmp, 10);
+  if (buf == tmp) {
+    return 1;
+  }
+  *dst = val;
+  return 0;
+}
+
 static void
 usage(char *arg0)
 {
@@ -121,15 +135,19 @@ shell_getarg(char *buf, char argarr[][SHELL_ARGLEN], int nargs)
     strncpy( (char *) &argarr[argidx][0], s, SHELL_ARGLEN );
     argidx++;
     if ( --nargs == 0 ) {
-      return nargs;
+      if (strtok(NULL, SHELL_DELIM) == NULL) {
+        return nargs;
+      } else return -1;
     }
   }
   return -1;
 }
 
 static void
-do_shell(void)
+do_shell()
 {
+  void *irshmem_ptr;
+  unsigned long int g_id;
   static char buf[SHELL_CMDLEN+1];
   ssize_t nread;
 
@@ -140,13 +158,17 @@ do_shell(void)
     if ( ir_strstr(buf, "GET") == buf ) {
       char g_args[1][SHELL_ARGLEN];
       if ( shell_getarg(buf, g_args, 1) != -1 ) {
-printf("*%s*\n", g_args[0]);
+        if ( str2int(g_args[0], &g_id) == 0 && (irshmem_ptr = irmem_getptr(g_id)) != NULL ) {
+          do_get(g_id, irshmem_ptr);
+        }
       }
     } else if ( ir_strstr(buf, "SET") == buf ) {
       char g_args[2][SHELL_ARGLEN];
+      unsigned long int value;
       if ( shell_getarg(buf, g_args, 2) != -1 ) {
-printf("*%s*\n", g_args[0]);
-printf("*%s*\n", g_args[1]);
+        if ( str2int(g_args[0], &g_id) == 0 && str2int(g_args[1], &value) == 0 && (irshmem_ptr = irmem_getptr(g_id)) != NULL ) {
+          do_set(g_id, irshmem_ptr, &value);
+        }
       }
     } else if ( ir_strstr(buf, "SHOW") == buf ) {
       do_all();
@@ -159,20 +181,6 @@ printf("*%s*\n", g_args[1]);
     printf("> ");
     memset(buf, '\0', SHELL_CMDLEN+1);
   }
-}
-
-int
-str2int(char *buf, unsigned long int *dst)
-{
-  char *tmp;
-  unsigned long int val;
-
-  val = strtoul(buf, &tmp, 10);
-  if (buf == tmp) {
-    return 1;
-  }
-  *dst = val;
-  return 0;
 }
 
 static char *
