@@ -5,6 +5,8 @@
 #define NO_DEBUG  1
 #endif
 
+#define IRALARM_PASSWDFILE "/etc/irxmppasswd"
+
 /* your rpi pinout */
 /* element position in the rpio pinout array */
 #define RPIO_PINPOS \

@@ -14,8 +14,6 @@
 typedef void (*irxmpp_cb)(int);
 
 
-extern const char *passwd_file;
-
 void
 irxmpp_set_jid(char *jid);
 
@@ -24,6 +22,9 @@ irxmpp_set_trusted(char *jid);
 
 void
 irxmpp_set_pass(char *pass);
+
+void
+irxmpp_set_passwdfile(char *file);
 
 int
 irxmpp_read_passwd_file(void);

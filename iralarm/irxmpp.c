@@ -12,8 +12,7 @@
 #include "irxmpp.h"
 
 
-const char *passwd_file = ".irxmppasswd";
-
+static char *passwd_file = NULL;
 static char *trusted_jid = NULL;
 static char *host = NULL;
 static unsigned short port = 0;
@@ -22,7 +21,7 @@ static xmpp_conn_t *conn = NULL;
 static xmpp_log_t log;
 static unsigned char do_reconnect = 0;
 #ifdef NO_DEBUG
-static xmpp_log_level_t loglvl = XMPP_LEVEL_DEBUG;
+static xmpp_log_level_t loglvl = XMPP_LEVEL_WARN;
 #else
 static xmpp_log_level_t loglvl = XMPP_LEVEL_DEBUG;
 #endif
@@ -68,35 +67,23 @@ irxmpp_set_pass(char *pass)
   }
 }
 
-static char *
-__build_passwd_path(void)
+void
+irxmpp_set_passwdfile(char *file)
 {
-  char *home = getenv("HOME");
-  if (home != NULL) {
-    size_t hlen = strnlen(home, PATH_MAX);
-    size_t plen = strnlen(passwd_file, PATH_MAX);
-    char *retstr = calloc(hlen + plen + 2, sizeof(char));
-    strncat(retstr, home, hlen);
-    if ( *(retstr + hlen - 1) != '/' ) {
-      *(retstr + hlen) = '/';
-    }
-    strncat(retstr, passwd_file, plen);
-    return retstr;
-  }
-  return NULL;
+  if (passwd_file != NULL) return;
+  passwd_file = strdup( (file == NULL ? IRALARM_PASSWDFILE : file) );
 }
 
 int
 irxmpp_read_passwd_file(void)
 {
-  char *path = __build_passwd_path();
   char passwd[BUFSIZ], *tmp;
   FILE *file;
   int retval = ERR_OK;
 
   errno = 0;
-  if (path != NULL) {
-    if ( (file = fopen(path, "r")) != NULL ) {
+  if (passwd_file != NULL) {
+    if ( (file = fopen(passwd_file, "r")) != NULL ) {
       memset(passwd, '\0', BUFSIZ);
       if ( fread( (char *) passwd, 1, BUFSIZ - 1, file ) >= 0 ) {
         tmp = strstr( (char *) passwd, "\n");
@@ -107,7 +94,6 @@ irxmpp_read_passwd_file(void)
       } else retval = ERR_SYSERR;
       fclose(file);
     } else retval = ERR_SYSERR;
-    free(path);
   } else retval = ERR_PATH;
   return retval;
 }
@@ -115,14 +101,13 @@ irxmpp_read_passwd_file(void)
 int 
 irxmpp_check_passwd_file(char **p_path)
 {
-  char *path = __build_passwd_path();   
   struct stat st;
   int retval = ERR_OK, i;
   static const int frbddn_bits[] = { S_ISUID, S_ISGID, S_IRGRP, S_IWGRP, S_IXGRP, S_IROTH, S_IWOTH, S_IXOTH };
 
   errno = 0;
-  if (path != NULL) {
-    if ( stat(path, &st) == 0 ) {
+  if (passwd_file != NULL) {
+    if ( stat(passwd_file, &st) == 0 ) {
       if ( S_ISREG(st.st_mode) && (st.st_mode & S_IRUSR) ) {
         for (i = 0; i < sizeof(frbddn_bits)/sizeof(frbddn_bits[0]); i++) {
           if ( (st.st_mode & frbddn_bits[i]) != 0) {
@@ -133,9 +118,7 @@ irxmpp_check_passwd_file(char **p_path)
       } else retval = ERR_CFG_MODE;
     } else retval = ERR_SYSERR;
     if (p_path != NULL) {
-      *p_path = path;
-    } else {
-      free(path);
+      *p_path = passwd_file;
     }
   } else retval = ERR_PATH;
   return retval;
@@ -431,8 +414,8 @@ __irxmpp_conn_handler(xmpp_conn_t * const conn, const xmpp_conn_event_t status,
     xmpp_send(conn, pres);
     xmpp_stanza_release(pres);
     pthread_cond_signal(&thrd_conn_cond);
-  } else if (status == XMPP_CONN_DISCONNECT) {
-    log("irxmpp: disconnected (error: %d)", error);
+  } else {
+    log("irxmpp: disconnected/error: %d(%d): %s", error, stream_error->type, stream_error->text);
   }
 }
 

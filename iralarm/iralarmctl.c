@@ -201,7 +201,7 @@ main(int argc, char **argv)
   enum ctlopt copt = NONE;
   char *basename;
 
-  if ( (basename = my_basename(argv[0])) != NULL && strstr(basename, "shell") ) {
+  if ( ( (basename = my_basename(argv[0])) != NULL && strstr(basename, "shell") ) || (strcmp(argv[0], "-su") == 0) ) {
     copt = SHELL;
   } else {
     if (argc == 1) {

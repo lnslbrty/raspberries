@@ -63,11 +63,10 @@ static char *chuser = NULL;
 void system_nowait(char *cmd[])
 {
   char homedir[PATH_MAX+1];
-  char *envp;
   pid_t pid = fork();
 
   memset(homedir, '\0', PATH_MAX+1);
-  snprintf(homedir, PATH_MAX, "%s", ( (envp = getenv("HOME")) != NULL ? envp : "/tmp" ));
+  snprintf(homedir, PATH_MAX, "%s", getenv("HOME"));
   signal(SIGCHLD, SIG_IGN);
   if (pid == 0) {
     close(0);
@@ -174,7 +173,7 @@ static void daemonize(char *user)
         }
         if (access(pwd->pw_dir, R_OK | W_OK) == 0) {
           setenv("HOME", pwd->pw_dir, 1);
-        } else fprintf(stderr, "homedir '%s' does not exist or is not read-/write-able\n", pwd->pw_dir);
+        }
       } else {
         fprintf(stderr, "user '%s' not found\n", user);
         exit(2);
@@ -368,6 +367,7 @@ static void usage(char *arg0)
                             "\t-s [HOST]\tjabber server\n"
                             "\t-p [PORT]\tspecify an alternative jabber port\n"
 #endif
+                            "\t-w [PASSWD-FILE]\tpassword file for your jabber account\n"
                             "\n";
   fprintf(stderr, usg, appname, author, email, arg0);
 }
@@ -405,7 +405,7 @@ main(int argc, char **argv)
 
   while ( (opt = getopt(argc, argv, "hu:"
 #ifdef DO_XMPP
-                                    "x:j:s:p:"
+                                    "x:j:s:p:w:"
 #endif
                                     )) != -1 ) {
     switch (opt) {
@@ -438,6 +438,10 @@ main(int argc, char **argv)
         }
         xmpp_opts |= 0x8;
         break;
+      /* jabber password file */
+      case 'w':
+        irxmpp_set_passwdfile(optarg);
+        break;
 #endif
       case 'h':
       default:
@@ -461,31 +465,31 @@ main(int argc, char **argv)
   daemonize(chuser);
 
 #ifdef DO_XMPP
-  switch ( irxmpp_check_passwd_file(&tmp) ) {
+  irxmpp_set_passwdfile(NULL);
+  switch ( (tmpval = irxmpp_check_passwd_file(&tmp)) ) {
     case ERR_OK:
       break;
     case ERR_SYSERR:
       log_err("%s: XMPP passwdfile (%s) check failed: %s\n", argv[0], tmp, strerror(errno));
       exit(1);
     case ERR_CFG_MODE:
-      log_err("%s: Check XMPP passwd file (%s) failed. It must have mode 0400 or 0600!\n", argv[0], tmp);
+      log_err("%s: Check XMPP passwdfile (%s) failed. It must have mode 0400 or 0600!\n", argv[0], tmp);
       exit(1);
     default:
-      log_err("%s: XMPP passwd file check failed\n", argv[0]);
+      log_err("%s: XMPP passwdfile check failed with %lu\n", argv[0], tmpval);
       exit(1);
   }
-  free(tmp);
-
-  switch (irxmpp_read_passwd_file()) {
+  switch ( (tmpval = irxmpp_read_passwd_file()) ) {
     case ERR_OK:
       break;
     case ERR_SYSERR:
-      fprintf(stderr, "%s: Could not read XMPP passwdfile: %s\n", argv[0], strerror(errno));
+      fprintf(stderr, "%s: Could not read XMPP passwdfile %s: %s\n", tmp, argv[0], strerror(errno));
       exit(1);
     default:
-      fprintf(stderr, "%s: XMPP passwd file read failed\n", argv[0]);
+      fprintf(stderr, "%s: XMPP passwdfile read failed with %lu\n", argv[0], tmpval);
       exit(1);
   }
+  free(tmp);
 
   switch ( irxmpp_startThread() ) {
     case 0:

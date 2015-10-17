@@ -38,14 +38,15 @@ irmem_init(int create)
   }
   if ( (shmkey = shmget(SHM_SEGID, cur_offset, (create == 0 ? IMEM_EXISTS : IMEM_DEFAULT))) == -1 ) {
     if ( (shmkey = shmget(SHM_SEGID, cur_offset, IMEM_FALLBCK)) == -1 ) {
-      fprintf(stderr, "Error(#%d) while get shared memory segment (%lu bytes): %s\n", errno, cur_offset, strerror(errno));
+      fprintf(stderr, "Error (%d) while get shared memory segment (%lu bytes): %s\n", errno, cur_offset, strerror(errno));
       ret = IRSM_NINIT;
+      return ret;
     } else { 
       ret = IRSM_RDONLY;
     }
   }
   if ( (shmptr = shmat(shmkey, NULL, (ret == IRSM_RDONLY ? SHM_RDONLY : 0) )) == (int *)(-1) ) {
-    fprintf(stderr, "Error while attach shared memory segment(%d): %s\n", errno, strerror(errno));
+    fprintf(stderr, "Error (%d) while attach shared memory segment: %s\n", errno, strerror(errno));
     ret = IRSM_NINIT;
   } else {
     for (i = 0; i < shmsiz; i++) {
