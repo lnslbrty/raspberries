@@ -108,7 +108,7 @@ doAlarmAction(void)
 
   tm = *localtime(&ir_alrm_start);
   log_emerg("%04d-%02d-%02d %02d:%02d:%02d ALARM! %d/%d IR-Low-Flanks, %d IR-Recvd-Cycles, %d Alarm-Cycles\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, ir_recvd, ir_minrecvd, ir_recvd_cycls, ir_alrm_cycls);
-#ifdef DO_XMPP /* TODO: use the faster libstrophe instead of a very slow perl script aka sendxmpp */
+#ifdef DO_XMPP
   if (s_xmpp > 0) {
     char buf[256];
     memset(buf, '\0', 256);
@@ -326,7 +326,10 @@ static void sighandler(int signum)
     case SIGALRM:
       break;
     case SIGTERM:
+#ifndef NO_DEBUG
     case SIGINT:
+#endif
+      log("%s", "shutdown ..");
       irxmpp_stopThread();
       irthread_stop(thrd_alarm);
       irthread_stop(thrd_status);
