@@ -9,33 +9,38 @@ endif
 WINCLUDES?=.
 WLIBDIR?=.
 CFLAGS=$(GFLAGS) -Wall -fPIC
-LDFLAGS=-pthread -lwiringPi -lstrophe -L/usr/local/lib
+LDFLAGS=-pthread -lwiringPi -L/usr/local/lib
 SOURCES=$(wildcard *.c)
 OBJECTS=$(patsubst %.c, %.o, $(SOURCES))
-DEPS=$(patsubst %.c, %.d, $(SOURCES))
+GDEPS=
+
+ifneq ($(DO_XMPP),)
+CFLAGS += -DDO_XMPP=1
+LDFLAGS += -lstrophe
+GDEPS += irxmpp.o
+endif
+
 ELFBIN=iralarmd
+ELFBIN_DEPS=irpio.o irthread.o irshmem.o iralarmd.o
 CTLBIN=iralarmctl
 SHBIN=iralarmshell
 TESTBIN=test
 
-
-all: $(OBJECTS) $(ELFBIN) $(CTLBIN) $(TESTBIN)
+all: $(ELFBIN) $(CTLBIN) $(TESTBIN)
 
 clean:
 	-$(RM) $(OBJECTS)
-	-$(RM) $(DEPS)
 	-$(RM) $(ELFBIN) $(CTLBIN) $(SHBIN)
 	-$(RM) $(TESTBIN)
 
 %.o: %.c
 	$(CC) -I$(WINCLUDES) $(CFLAGS) -c -o $@ $<
-	$(CC) -MM $(CFLAGS) $< > $(patsubst %.c, %.d, $<)
 
-$(TESTBIN): irthread.o irshmem.o
-	$(CC) -L$(WLIBDIR) $(LDFLAGS) irthread.o irshmem.o test.o -o $(TESTBIN)
+$(TESTBIN): irthread.o irshmem.o $(GDEPS)
+	$(CC) -L$(WLIBDIR) $(LDFLAGS) irthread.o irshmem.o test.c -o $(TESTBIN)
 	chmod +x $(TESTBIN)
 
-$(ELFBIN): irxmpp.o irpio.o irthread.o irshmem.o iralarmd.o
+$(ELFBIN): irpio.o irthread.o irshmem.o iralarmd.o $(GDEPS)
 	$(CC) -L$(WLIBDIR) $(LDFLAGS) $+ -o $(ELFBIN)
 	chmod +x $(ELFBIN)
 

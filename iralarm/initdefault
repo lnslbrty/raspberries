@@ -1,6 +1,7 @@
 IRALARM_USER="iralarmd"
-IRALARM_JID="iralarmd@jabber.de"
-IRALARM_RCP="mage@jabber.ccc.de"
-IRALARM_SRV="jabber.de"
-IRALARM_PASSFILE="/etc/irxmppasswd"
 
+#IRALARM_XMPP="yes"
+#IRALARM_JID="iralarmd@jabber.de"
+#IRALARM_RCP="mage@jabber.ccc.de"
+#IRALARM_SRV="jabber.de"
+#IRALARM_PASSFILE="/etc/irxmppasswd"

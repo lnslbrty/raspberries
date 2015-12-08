@@ -18,7 +18,9 @@
 #include "irshmem.h"
 #include "irpio.h"
 #include "irthread.h"
+#ifdef DO_XMPP
 #include "irxmpp.h"
+#endif
 
 
 #define PLCK_STAT 0
@@ -42,7 +44,9 @@ static uint32_t ir_rstalarm = MIN_ALRST;
 
 static unsigned char s_aactive = 1, s_speaker = 0, *s_astate;
 #ifdef DO_XMPP
-static unsigned char s_xmpp = 1;
+static int8_t s_xmpp = 1;
+#else
+static int8_t s_xmpp = -1;
 #endif
 #ifdef ENABLE_RASPICAM
 static unsigned char s_video = 0;
@@ -256,6 +260,7 @@ alarm_thread(irthread_t tid, void *data)
   }
 }
 
+#ifdef DO_XMPP
 void
 irxmpp_thrd_callback(int id) {
   char *buf;
@@ -308,6 +313,7 @@ irxmpp_thrd_callback(int id) {
       break;
   }
 }
+#endif
 
 static void sighandler(int signum)
 {
@@ -330,7 +336,9 @@ static void sighandler(int signum)
     case SIGINT:
 #endif
       log("%s", "shutdown ..");
+#ifdef DO_XMPP
       irxmpp_stopThread();
+#endif
       irthread_stop(thrd_alarm);
       irthread_stop(thrd_status);
       irpio_lowall();
@@ -345,7 +353,9 @@ static void sighandler(int signum)
       GETPTR_SAFE(SHM_ACTIVE, s_aactive, ucptr);
       GETPTR_SAFE(SHM_MLOOP, s_mainloop, szptr);
       GETPTR_SAFE(SHM_SPKR, s_speaker, ucptr);
+#ifdef DO_XMPP
       GETPTR_SAFE(SHM_XMPP, s_xmpp, ucptr);
+#endif
       GETPTR_SAFE(SHM_VIDEO, s_video, ucptr);
       GETPTR_SAFE(SHM_STLEDON, s_statusled_on, szptr);
       GETPTR_SAFE(SHM_STLEDOFF, s_statusled_off, szptr);
@@ -369,8 +379,8 @@ static void usage(char *arg0)
                             "\t-j [JID]\tlogin jabber id\n"
                             "\t-s [HOST]\tjabber server\n"
                             "\t-p [PORT]\tspecify an alternative jabber port\n"
-#endif
                             "\t-w [PASSWD-FILE]\tpassword file for your jabber account\n"
+#endif
                             "\n";
   fprintf(stderr, usg, appname, author, email, arg0);
 }
@@ -381,9 +391,9 @@ main(int argc, char **argv)
   uint32_t *szptr;
   unsigned char *ucptr;
   int opt;
+#ifdef DO_XMPP
   char *tmp;
   unsigned long int tmpval;
-#ifdef DO_XMPP
   uint8_t xmpp_opts = 0;
 #endif
 
@@ -404,12 +414,11 @@ main(int argc, char **argv)
   sigprocmask(SIG_BLOCK, &block_mask, NULL);
 
   log_init();
-  irxmpp_initialize(irxmpp_thrd_callback);
-
-  while ( (opt = getopt(argc, argv, "hu:"
 #ifdef DO_XMPP
-                                    "x:j:s:p:w:"
+  irxmpp_initialize(irxmpp_thrd_callback);
 #endif
+
+  while ( (opt = getopt(argc, argv, "hu:x:j:s:p:w:"
                                     )) != -1 ) {
     switch (opt) {
       case 'u':
@@ -444,6 +453,14 @@ main(int argc, char **argv)
       /* jabber password file */
       case 'w':
         irxmpp_set_passwdfile(optarg);
+        break;
+#else
+      case 'x':
+      case 'j':
+      case 's':
+      case 'p':
+      case 'w':
+        fprintf(stderr, "%s: option '%c' not supported\n", argv[0], opt);
         break;
 #endif
       case 'h':
@@ -526,7 +543,9 @@ main(int argc, char **argv)
   SETPTR_SAFE(SHM_ACTIVE, s_aactive, ucptr);
   SETPTR_SAFE(SHM_MLOOP, s_mainloop, szptr);
   SETPTR_SAFE(SHM_SPKR, s_speaker, ucptr);
+#ifdef DO_XMPP
   SETPTR_SAFE(SHM_XMPP, s_xmpp, ucptr);
+#endif
   SETPTR_SAFE(SHM_VIDEO, s_video, ucptr);
   SETPTR_SAFE(SHM_STLEDON, s_statusled_on, szptr);
   SETPTR_SAFE(SHM_STLEDOFF, s_statusled_off, szptr);

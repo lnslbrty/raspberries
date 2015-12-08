@@ -71,7 +71,8 @@
 #define MIN_ALRST 15
 
 /* send a XMPP message if in alarm state */
-#define DO_XMPP 1
+/* same as make DO_XMPP=1 */
+//#define DO_XMPP 1
 #define IRXMPP_STATUS 0
 #define IRXMPP_CONFIG 1
 #define IRXMPP_CBARGS \
