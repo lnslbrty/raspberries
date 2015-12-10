@@ -1,46 +1,55 @@
 #include <linux/module.h>
 #include <linux/printk.h>
-#include <linux/kobject.h>
 #include <linux/sysfs.h>
+#include <linux/cdev.h>
+#include <linux/device.h>
 #include <linux/init.h>
-#include <linux/fs.h>
 #include <linux/string.h>
 
 #include "portex.h"
 
 
-static struct kobject *ko_portex = NULL;
-static int test = 1;
+// Store and Show functions……
+static ssize_t attr1_store(struct class *cls, struct class_attribute *attr, const char *buf, size_t count);
+static ssize_t attr1_show(struct class *cls, struct class_attribute *attr, char *buf);
 
+// Attributes declaration: Here I have declared only one attribute attr1
+static struct class_attribute pwm_class_attrs[] = {
+  __ATTR(attr1, S_IRUGO | S_IWUSR , attr1_show, attr1_store), // use macro for permission
+  __ATTR_NULL
+};
 
-static ssize_t test_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+//Struct class is basic struct needed to create classs attributes.”dev_jes” is the directory under /sys/class.
+static struct class pwm_class =
 {
-  return sprintf(buf, "%d\n", test);
+  .name = "portex",
+  .owner = THIS_MODULE,
+  .class_attrs = pwm_class_attrs
+};
+
+static unsigned int test = 0;
+
+
+// class attribute show function.
+static ssize_t attr1_show(struct class *cls, struct class_attribute *attr, char *buf)
+{
+  return sprintf(buf, "%u\n", test);
 }
 
-static ssize_t test_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+// class attribute store function
+static ssize_t attr1_store(struct class *cls, struct class_attribute *attr, const char *buf, size_t count)
 {
-  sscanf(buf, "%du", &test);
+  sscanf(buf, "%u", &test);
   return count;
 }
 
-static struct kobj_attribute my_attr = __ATTR(test, 0644, test_show, test_store);
-
 int portex_sysfs_init(void)
 {
-  int err = 0;
-
-  ko_portex = kobject_create_and_add("pe_kobject", kernel_kobj);
-  if (!ko_portex)
-    return -ENOMEM;
-  err = sysfs_create_file(ko_portex, &my_attr.attr);
-  if (err)
-    INFO("%s", "sysfs error");
-
-  return err;
+  class_register(&pwm_class);
+  return 0;
 }
 
 void portex_sysfs_free(void)
 {
-  kobject_put(ko_portex);
+  class_unregister(&pwm_class);
 }

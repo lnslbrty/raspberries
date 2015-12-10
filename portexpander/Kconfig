@@ -1,0 +1,6 @@
+menu "Portexpander"
+
+config PORTEX
+	tristate "GPIO Portexpander"
+
+endmenu

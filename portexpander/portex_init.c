@@ -4,7 +4,7 @@
  * @date   08.12.2015
  */
 
-
+#include <linux/kernel.h>
 #include <linux/init.h>		// basic macro definitions, generated while your kernel was compiled
 #include <linux/module.h>	// basic macro/function/struct definitions for kernel modules like MODULE_*
 #include <linux/moduleparam.h>	// kernel module parameter macros/functions
@@ -31,17 +31,21 @@ static int __init pe_mod_init(void)
 {
   INFO("%s", "init");
   INFO("shift_regs=%u, shift_pins=%u", shift_regs, shift_pins);
+  if (portex_sysfs_init()) {
+    INFO("%s", "sysfs init failed");
+    return 1;
+  }
   return 0;
 }
 
 /* What should happen, when this module gets unloaded? */
 static void __exit pe_mod_exit(void)
 {
+  portex_sysfs_free();
   INFO("%s", "unloaded");
 }
 
 
-/* the compiler has to know the entry function */
+/* the lnker needs to know the entry/exit function */
 module_init(pe_mod_init);
-/* replace entry with exit */
 module_exit(pe_mod_exit);

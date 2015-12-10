@@ -1,5 +1,6 @@
-obj-m+=portex.o
-portex-objs := portex_sysfs.o
+obj-$(CONFIG_PORTEX) := portex.o
+portex-objs := portex_init.o portex_sysfs.o
+
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build/ M=$(PWD) modules
