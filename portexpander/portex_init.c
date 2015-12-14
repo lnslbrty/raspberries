@@ -1,5 +1,5 @@
 /**
- * @file   pe_mod.c
+ * @file   portex_init.c
  * @author Toni Uhlig, Eric Mueller
  * @date   08.12.2015
  */
@@ -17,23 +17,23 @@ MODULE_AUTHOR("Toni Uhlig, Eric Mueller");
 MODULE_DESCRIPTION("A GPIO based PortExpander for Linux");
 MODULE_VERSION("0.1");
 
-static unsigned short shift_regs = 1;
-static unsigned short shift_pins = 7;
+static s16 bus_num = 0;
 
-module_param(shift_regs, short, S_IRUSR | S_IWUSR);
-MODULE_PARM_DESC(shift_regs, "Shift register count");
-module_param(shift_pins, short, S_IRUSR | S_IWUSR);
-MODULE_PARM_DESC(shift_pins, "Shift register pin count");
+module_param(bus_num, short, 0);
+MODULE_PARM_DESC(bus_num, "MCP23S08 bus number");
 
 
 /* What should happen, when this module gets loaded? */
 static int __init pe_mod_init(void)
 {
+  int ret;
+
   INFO("%s", "init");
-  INFO("shift_regs=%u, shift_pins=%u", shift_regs, shift_pins);
-  if (portex_sysfs_init()) {
-    INFO("%s", "sysfs init failed");
-    return 1;
+  if ( (ret = portex_spi_init()) != 0 ) {
+    return ret;
+  }
+  if ( (ret = portex_sysfs_init()) != 0 ) {
+    return ret;
   }
   return 0;
 }
@@ -42,6 +42,7 @@ static int __init pe_mod_init(void)
 static void __exit pe_mod_exit(void)
 {
   portex_sysfs_free();
+  portex_spi_free();
   INFO("%s", "unloaded");
 }
 

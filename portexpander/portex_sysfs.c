@@ -1,7 +1,11 @@
+/**
+ * @file   portex_sysfs.c
+ * @author Toni Uhlig, Eric Mueller
+ * @date   10.12.2015
+ */
+
 #include <linux/module.h>
-#include <linux/printk.h>
 #include <linux/sysfs.h>
-#include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/string.h>
