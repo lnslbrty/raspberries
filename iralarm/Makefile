@@ -9,7 +9,7 @@ endif
 WINCLUDES?=.
 WLIBDIR?=.
 CFLAGS=$(GFLAGS) -Wall -fPIC
-LDFLAGS=-pthread -lwiringPi -L/usr/local/lib
+LDFLAGS=-pthread
 SOURCES=$(wildcard *.c)
 OBJECTS=$(patsubst %.c, %.o, $(SOURCES))
 GDEPS=

@@ -11,7 +11,6 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-#include <wiringPi.h>
 
 #include "config.h"
 #include "log.h"
@@ -21,9 +20,6 @@
 #ifdef DO_XMPP
 #include "irxmpp.h"
 #endif
-
-
-#define PLCK_STAT 0
 
 
 enum alrm_state {
@@ -111,7 +107,7 @@ doAlarmAction(void)
   struct tm tm;
 
   tm = *localtime(&ir_alrm_start);
-  log_emerg("%04d-%02d-%02d %02d:%02d:%02d ALARM! %d/%d IR-Low-Flanks, %d IR-Recvd-Cycles, %d Alarm-Cycles\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, ir_recvd, ir_minrecvd, ir_recvd_cycls, ir_alrm_cycls);
+  log_emerg("%04d-%02d-%02d %02d:%02d:%02d ALARM! %lu/%lu IR-Low-Flanks, %lu IR-Recvd-Cycles, %lu Alarm-Cycles\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, (long unsigned int)ir_recvd, (long unsigned int)ir_minrecvd, (long unsigned int)ir_recvd_cycls, (long unsigned int)ir_alrm_cycls);
 #ifdef DO_XMPP
   if (s_xmpp > 0) {
     char buf[256];
@@ -139,7 +135,7 @@ undoAlarmAction(void)
   time(&ir_alrm_stop);
   difftm = difftime(ir_alrm_stop, ir_alrm_start);
   tm = *localtime(&ir_alrm_stop);
-  log_emerg("%04d-%02d-%02d %02d:%02d:%02d ALARM STOPPED, ACTIVE FOR %ds, %d/%d IR-Low-Flanks, %d IR-Recvd-Cycles, %d Alarm-Cycles\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, (int) difftm, ir_recvd, ir_rstalarm, ir_recvd_cycls, ir_alrm_cycls);
+  log_emerg("%04d-%02d-%02d %02d:%02d:%02d ALARM STOPPED, ACTIVE FOR %ds, %lu/%lu IR-Low-Flanks, %lu IR-Recvd-Cycles, %lu Alarm-Cycles\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, (int) difftm, (long unsigned int)ir_recvd, (long unsigned int)ir_rstalarm, (long unsigned int)ir_recvd_cycls, (long unsigned int)ir_alrm_cycls);
 #endif
 }
 
@@ -205,25 +201,25 @@ status_led(irthread_t tid, void *data)
 
   switch ( (enum alrm_state) data ) {
     case ALRM_NONE:
-      digitalWrite(PIN(STATS), 1);
+      irpio_digitalWrite(PIN(STATS), 1);
       usleep(__s_statusled_on);
-      digitalWrite(PIN(STATS), 0);
+      irpio_digitalWrite(PIN(STATS), 0);
       usleep(__s_statusled_off);
       break;
     case ALRM_PREACTIVE:
-      digitalWrite(PIN(STATS), 1);
+      irpio_digitalWrite(PIN(STATS), 1);
       usleep(__s_statusled_on);
-      digitalWrite(PIN(STATS), 0);
+      irpio_digitalWrite(PIN(STATS), 0);
       usleep(__s_statusled_on);
-      digitalWrite(PIN(STATS), 1);
+      irpio_digitalWrite(PIN(STATS), 1);
       usleep(__s_statusled_on);
-      digitalWrite(PIN(STATS), 0);
+      irpio_digitalWrite(PIN(STATS), 0);
       usleep(__s_statusled_off/2);
       break;
     case ALRM_ACTIVE:
-      digitalWrite(PIN(STATS), 1);
+      irpio_digitalWrite(PIN(STATS), 1);
       usleep(__s_statusled_on);
-      digitalWrite(PIN(STATS), 0);
+      irpio_digitalWrite(PIN(STATS), 0);
       usleep(__s_statusled_on*2);
       break;
   }
@@ -238,22 +234,22 @@ alarm_thread(irthread_t tid, void *data)
 
   switch ( (enum alrm_state) data ) {
     case ALRM_ACTIVE:
-      if (__s_speaker > 0) digitalWrite(PIN(SPEKR), 1);
-      digitalWrite(PIN(ALARM), 0);
+      if (__s_speaker > 0) irpio_digitalWrite(PIN(SPEKR), 1);
+      irpio_digitalWrite(PIN(ALARM), 0);
       usleep(250000);
-      digitalWrite(PIN(SPEKR), 0);
-      digitalWrite(PIN(ALARM), 1);
+      irpio_digitalWrite(PIN(SPEKR), 0);
+      irpio_digitalWrite(PIN(ALARM), 1);
       usleep(250000);
       break;
     case ALRM_PREACTIVE:
-      digitalWrite(PIN(ALARM), 1);
+      irpio_digitalWrite(PIN(ALARM), 1);
       usleep(100000);
-      digitalWrite(PIN(ALARM), 0);
+      irpio_digitalWrite(PIN(ALARM), 0);
       usleep(100000);
       break;
     case ALRM_NONE:
-      digitalWrite(PIN(ALARM), 0);
-      digitalWrite(PIN(SPEKR), 0);
+      irpio_digitalWrite(PIN(ALARM), 0);
+      irpio_digitalWrite(PIN(SPEKR), 0);
       usleep(100000);
       irthread_suspend(thrd_alarm);
       break;
@@ -481,7 +477,12 @@ main(int argc, char **argv)
     exit(1);
   }
 
-  wiringPiSetup();
+/* init raspberrypi GPIO's */
+  irpio_init();
+  irpio_setpwm(RPIO_PWM_CLOCK, RPIO_PWM_RANGE);
+#ifdef NO_DEBUG
+  irpio_selftest(); // selftest is not useful
+#endif
   daemonize(chuser);
 
 #ifdef DO_XMPP
@@ -554,17 +555,11 @@ main(int argc, char **argv)
   SETPTR_SAFE(SHM_RSTALRMS, ir_rstalarm, szptr);
   SETPTR_SAFE(SHM_ALARM, astate, s_astate);
 
-  /* init raspberrypi GPIO's */
-  irpio_init();
-  irpio_setpwm(RPIO_PWM_CLOCK, RPIO_PWM_RANGE);
-#ifdef NO_DEBUG
-  irpio_selftest(); // selftest is not useful
-#endif
   irpio_setvalue(IRLED, RPIO_PWM_RANGE-1);
   thrd_status = irthread_start(status_led);
   thrd_alarm = irthread_start(alarm_thread);
   irthread_suspend(thrd_alarm);
-  wiringPiISR(PIN(IRECV), INT_EDGE_FALLING, ir_flank);
+  irpio_isr(PIN(IRECV), INT_EDGE_FALLING, ir_flank);
 
   /* set up WAIT semaphore */
   if ( (sem_id = semget(SEM_ID, 1, IPC_CREAT | 0660)) == -1 ) {
