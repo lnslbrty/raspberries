@@ -11,79 +11,135 @@
 
 #include "portex.h"
 
-#define MCP23_S_17_ID 0x0
+#define DRIVER_NAME "mcp23s17"
 
+
+static const char *drv_name = DRIVER_NAME;
+static struct spi_device *spi_mcp23s17 = NULL;
 
 /* function prototypes */
 static int mcp23s17_probe(struct spi_device *spi);
 static int mcp23s17_remove(struct spi_device *spi);
-static int mcp23s17_suspend(struct spi_device *spi, pm_message_t state);
-static int mcp23s17_resume(struct spi_device *spi);
 
 
+/* MCP23S17 slave info */
+static struct spi_board_info mcp23s17_info = {
+  .modalias = DRIVER_NAME,
+  .max_speed_hz = 10000000,
+  .bus_num = 0,
+  .chip_select = 0,
+  .mode = SPI_MODE_0,
+};
 
-/* MCP23S08 device protocol information */
-static struct spi_driver mcp23s08_driver = {
+/* MCP23S17 device driver information */
+static struct spi_driver mcp23s17_driver = {
   /* default linux driver device information */
   .driver = {
-    .name  = "mcp23s17",
-    .bus   = &spi_bus_type,
+    .name  = DRIVER_NAME,
     .owner = THIS_MODULE,
   },
   /* callback functions for the mcp23s08 */
   .probe   = mcp23s17_probe,   // called by the spi master, when a spi device was found
   .remove  = mcp23s17_remove,  // replace found with removed
-  .suspend = mcp23s17_suspend,
-  .resume  = mcp23s17_resume,
 };
 
-/*
-static int mcp23s17_read(unsigned int reg)
+static int mcp23s17_read(enum MCP23S17_ADDR addr, enum MCP23S17_REGS reg, u8 *value_ptr)
 {
-  return 0;
+  int ret;
+  u8 tx[3], rx[3];
+
+  tx[0] = 0x41 | addr; // datasheet: controlbyte: 01000 A1 A0 1
+  tx[1] = reg;
+  tx[2] = 0x00;
+  ret = spi_write_then_read(spi_mcp23s17, &tx[0], sizeof(tx), &rx[0], sizeof(rx));
+  if (!ret) {
+    *value_ptr = rx[0];
+  }
+  return ret;
 }
-*/
 
 static int mcp23s17_write(enum MCP23S17_ADDR addr, enum MCP23S17_REGS reg, u8 value)
 {
   u8 tx[3];
 
-  tx[0] = 0x40 | addr; // datasheet: controlbyte: 01000 A1 A0 R/W
+  tx[0] = 0x40 | addr; // datasheet: controlbyte: 01000 A1 A0 0
   tx[1] = reg;
   tx[2] = value;
-  return 0;
+  return spi_write(spi_mcp23s17, &tx[0], sizeof(tx));
 }
 
 static int mcp23s17_probe(struct spi_device *spi)
 {
-  dev_dbg(&spi->dev, "probing done\n");
+  int ret;
+  u8 tval;
+
+  pr_info("%s: %s()\n", drv_name, __func__);
+
+  mcp23s17_write(MCP23S17_ADDR_00, MCP23S17_REG_IODIR, 0xFF);
+  ret = mcp23s17_read(MCP23S17_ADDR_00, MCP23S17_REG_IODIR, &tval);
+  pr_info("%s: %s(): (%d)IODIR: %u\n", drv_name, __func__, ret, tval);
+
   mcp23s17_write(MCP23S17_ADDR_00, MCP23S17_REG_IODIR, 0x00);
   mcp23s17_write(MCP23S17_ADDR_00, MCP23S17_REG_GPIO, 0xFF);
+
+  ret = mcp23s17_read(MCP23S17_ADDR_00, MCP23S17_REG_IODIR, &tval);
+  pr_info("%s: %s(): (%d)IODIR: %u\n", drv_name, __func__, ret, tval);
+
   return 0;
 }
 
 static int mcp23s17_remove(struct spi_device *spi)
 {
-  dev_dbg(&spi->dev, "remove\n");
+  dev_dbg(&spi->dev, "%s()\n", __func__);
   return 0;
 }
 
-static int mcp23s17_suspend(struct spi_device *spi, pm_message_t state)
+static void spidevices_delete(struct spi_master *master, unsigned cs)
 {
-  return 0;
-}
+  struct device *dev;
+  char str[32];
 
-static int mcp23s17_resume(struct spi_device *spi)
-{
-  return 0;
+  snprintf(str, sizeof(str), "%s.%u", dev_name(&master->dev), cs);
+
+  dev = bus_find_device_by_name(&spi_bus_type, NULL, str);
+  if (dev) {
+    pr_err("%s: Deleting %s\n", drv_name, str);
+    device_del(dev);
+  }
 }
 
 int portex_spi_init(void)
 {
-  return spi_register_driver(&mcp23s08_driver);
+  struct spi_master *master;
+
+  pr_info("%s: %s()\n", drv_name, __func__);
+
+  master = spi_busnum_to_master(mcp23s17_info.bus_num);
+  if (!master) {
+    pr_err("%s: spi_busnum_to_master(%d) returned NULL\n", drv_name, mcp23s17_info.bus_num);
+    return -EINVAL;
+  }
+
+  /* delete all registered devices (registered by bcm2708_spi) */
+  spidevices_delete(master, mcp23s17_info.chip_select);
+
+  spi_mcp23s17 = spi_new_device(master, &mcp23s17_info);
+  put_device(&master->dev);
+  if (!spi_mcp23s17) {
+     pr_err("%s: spi_new_device() returned NULL\n", drv_name);
+     return -EPERM;
+  }
+
+  return spi_register_driver(&mcp23s17_driver);
 }
 
 void portex_spi_free(void)
 {
-  spi_unregister_driver(&mcp23s08_driver);
+   pr_info("%s: %s()\n", drv_name, __func__);
+   spi_unregister_driver(&mcp23s17_driver);
+
+   if (spi_mcp23s17) {
+      device_del(&spi_mcp23s17->dev);
+      kfree(spi_mcp23s17);
+   }
 }
