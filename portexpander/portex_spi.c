@@ -43,22 +43,18 @@ static struct spi_driver mcp23s17_driver = {
   .remove  = mcp23s17_remove,  // replace found with removed
 };
 
-static int mcp23s17_read(enum MCP23S17_ADDR addr, enum MCP23S17_REGS reg, u8 *value_ptr)
+static int mcp23s17_read(enum MCP23S_ADDR addr, enum MCP23S_REGS reg)
 {
   int ret;
-  u8 tx[3], rx[3];
+  u8 tx[2], rx[2];
 
   tx[0] = 0x41 | addr; // datasheet: controlbyte: 01000 A1 A0 1
   tx[1] = reg;
-  tx[2] = 0x00;
   ret = spi_write_then_read(spi_mcp23s17, &tx[0], sizeof(tx), &rx[0], sizeof(rx));
-  if (!ret) {
-    *value_ptr = rx[0];
-  }
-  return ret;
+  return (ret < 0 ? ret : rx[0] | rx[1] << 8);
 }
 
-static int mcp23s17_write(enum MCP23S17_ADDR addr, enum MCP23S17_REGS reg, u8 value)
+static int mcp23s17_write(enum MCP23S_ADDR addr, enum MCP23S_REGS reg, u8 value)
 {
   u8 tx[3];
 
@@ -70,20 +66,14 @@ static int mcp23s17_write(enum MCP23S17_ADDR addr, enum MCP23S17_REGS reg, u8 va
 
 static int mcp23s17_probe(struct spi_device *spi)
 {
-  int ret;
-  u8 tval;
-
   pr_info("%s: %s()\n", drv_name, __func__);
 
-  mcp23s17_write(MCP23S17_ADDR_00, MCP23S17_REG_IODIR, 0xFF);
-  ret = mcp23s17_read(MCP23S17_ADDR_00, MCP23S17_REG_IODIR, &tval);
-  pr_info("%s: %s(): (%d)IODIR: %u\n", drv_name, __func__, ret, tval);
+  if (mcp23s17_read(MCP23S_ADDR_00, MCP23S08_REG_IODIR) != 0xFFFF) {
+    return -ENODEV;
+  }
 
-  mcp23s17_write(MCP23S17_ADDR_00, MCP23S17_REG_IODIR, 0x00);
-  mcp23s17_write(MCP23S17_ADDR_00, MCP23S17_REG_GPIO, 0xFF);
-
-  ret = mcp23s17_read(MCP23S17_ADDR_00, MCP23S17_REG_IODIR, &tval);
-  pr_info("%s: %s(): (%d)IODIR: %u\n", drv_name, __func__, ret, tval);
+  mcp23s17_write(MCP23S_ADDR_00, MCP23S08_REG_IODIR, 0x00);
+  mcp23s17_write(MCP23S_ADDR_00, MCP23S08_REG_GPIO,  0xFF);
 
   return 0;
 }
@@ -135,11 +125,15 @@ int portex_spi_init(void)
 
 void portex_spi_free(void)
 {
-   pr_info("%s: %s()\n", drv_name, __func__);
-   spi_unregister_driver(&mcp23s17_driver);
+  pr_info("%s: %s()\n", drv_name, __func__);
 
-   if (spi_mcp23s17) {
-      device_del(&spi_mcp23s17->dev);
-      kfree(spi_mcp23s17);
-   }
+  /* restore default IODIR/GPIO values */
+  mcp23s17_write(MCP23S_ADDR_00, MCP23S08_REG_GPIO,  0x00);
+  mcp23s17_write(MCP23S_ADDR_00, MCP23S08_REG_IODIR, 0xFF);
+
+  spi_unregister_driver(&mcp23s17_driver);
+  if (spi_mcp23s17) {
+    device_del(&spi_mcp23s17->dev);
+    kfree(spi_mcp23s17);
+  }
 }
