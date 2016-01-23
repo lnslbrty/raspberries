@@ -6,7 +6,6 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/of_device.h>
 #include <linux/spi/spi.h>
 
 #include "portex.h"
@@ -71,9 +70,14 @@ static int mcp23s17_probe(struct spi_device *spi)
   if (mcp23s17_read(MCP23S_ADDR_00, MCP23S08_REG_IODIR) != 0xFFFF) {
     return -ENODEV;
   }
+  if (mcp23s17_read(MCP23S_ADDR_00, MCP23S17_REG_IODIR) != 0xFFFF) {
+    return -ENODEV;
+  }
 
   mcp23s17_write(MCP23S_ADDR_00, MCP23S08_REG_IODIR, 0x00);
   mcp23s17_write(MCP23S_ADDR_00, MCP23S08_REG_GPIO,  0xFF);
+  mcp23s17_write(MCP23S_ADDR_00, MCP23S17_REG_IODIR, 0x00);
+  mcp23s17_write(MCP23S_ADDR_00, MCP23S17_REG_GPIO,  0xFF);
 
   return 0;
 }
@@ -110,7 +114,7 @@ int portex_spi_init(void)
     return -EINVAL;
   }
 
-  /* delete all registered devices (registered by bcm2708_spi) */
+  /* delete all registered devices using the same cs (registered by bcm2708_spi) */
   spidevices_delete(master, mcp23s17_info.chip_select);
 
   spi_mcp23s17 = spi_new_device(master, &mcp23s17_info);
@@ -130,6 +134,8 @@ void portex_spi_free(void)
   /* restore default IODIR/GPIO values */
   mcp23s17_write(MCP23S_ADDR_00, MCP23S08_REG_GPIO,  0x00);
   mcp23s17_write(MCP23S_ADDR_00, MCP23S08_REG_IODIR, 0xFF);
+  mcp23s17_write(MCP23S_ADDR_00, MCP23S17_REG_GPIO,  0x00);
+  mcp23s17_write(MCP23S_ADDR_00, MCP23S17_REG_IODIR, 0xFF);
 
   spi_unregister_driver(&mcp23s17_driver);
   if (spi_mcp23s17) {
