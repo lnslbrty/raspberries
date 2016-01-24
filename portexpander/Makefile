@@ -1,5 +1,6 @@
 obj-$(CONFIG_PORTEX) := portex.o
 portex-objs := portex_init.o portex_sysfs.o portex_spi.o
+ccflags-y := -Wall
 
 
 all:

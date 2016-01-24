@@ -17,7 +17,7 @@ static const char *drv_name = DRIVER_NAME;
 
 /* per device declarations */
 static struct spi_device *spi_mcp23s17 = NULL;
-static u8 cache_mcp23s17[2]; // per port cache
+static u8 cache_mcp23s17[REG_MAX]; // per device register cache
 
 /* function prototypes */
 static int mcp23s17_probe(struct spi_device *spi);
@@ -66,36 +66,39 @@ static int mcp23s17_write(enum MCP23S_ADDR addr, enum MCP23S_REGS reg, u8 value)
   return spi_write(spi_mcp23s17, &tx[0], sizeof(tx));
 }
 
-void portex_write_cached(enum MCP23S_PORT port, u8 pin_mask, u8 value)
+void portex_write_cached(enum MCP23S_REGS port, u8 pin_mask, u8 value)
 {
   if (!value) {
     cache_mcp23s17[port] &= ~pin_mask;
   } else {
     cache_mcp23s17[port] |= pin_mask;
   }
-  mcp23s17_write(MCP23S08_ADDR_00,
-                 (port == MCP23S17_PORT ? MCP23S17_REG_GPIO : MCP23S08_REG_GPIO),
-                 cache_mcp23s17[port]);
+  mcp23s17_write(MCP23S08_ADDR_00, port, cache_mcp23s17[port]);
 }
 
-int portex_read_cached(enum MCP23S_PORT port, u8 pin_mask)
+int portex_read_cached(enum MCP23S_REGS port, u8 pin_mask)
 {
-  cache_mcp23s17[port] = (mcp23s17_read(MCP23S08_ADDR_00,
-                                        (port == MCP23S17_PORT ? MCP23S17_REG_GPIO : MCP23S08_REG_GPIO)
-                                       ) & 0xFF);
+  cache_mcp23s17[port] = (mcp23s17_read(MCP23S08_ADDR_00, port) & 0xFF);
   return (cache_mcp23s17[port] & pin_mask) >> pin_mask;
 }
 
 static int mcp23s17_probe(struct spi_device *spi)
 {
+  u16 probe_retval;
+
   pr_info("%s: %s()\n", drv_name, __func__);
 
-  if (mcp23s17_read(MCP23S08_ADDR_00, MCP23S08_REG_IODIR) != 0xFFFF) {
+  if ((probe_retval = mcp23s17_read(MCP23S08_ADDR_00, MCP23S08_REG_IODIR)) != 0xFFFF) {
+    pr_err("%s: %s() mcp23s17_read(iodir: %d) returned %u\n", drv_name, __func__, MCP23S08_REG_IODIR, probe_retval);
     return -ENODEV;
   }
-  if (mcp23s17_read(MCP23S08_ADDR_00, MCP23S17_REG_IODIR) != 0xFFFF) {
+  if ((probe_retval = mcp23s17_read(MCP23S08_ADDR_00, MCP23S17_REG_IODIR)) != 0xFFFF) {
+    pr_err("%s: %s() mcp23s17_read(iodir: %d) returned %u\n", drv_name, __func__, MCP23S17_REG_IODIR, probe_retval);
     return -ENODEV;
   }
+  /* set all pins direction to out (TODO: sysfs should set the direction) */
+  mcp23s17_write(MCP23S08_ADDR_00, MCP23S08_REG_IODIR, 0x00);
+  portex_write_cached(MCP23S08_REG_GPIO, 0xFF, 1);
 /*
   // debug stuff
   mcp23s17_write(MCP23S08_ADDR_00, MCP23S08_REG_IODIR, 0x00);
@@ -103,6 +106,7 @@ static int mcp23s17_probe(struct spi_device *spi)
   mcp23s17_write(MCP23S08_ADDR_00, MCP23S17_REG_IODIR, 0x00);
   mcp23s17_write(MCP23S08_ADDR_00, MCP23S17_REG_GPIO,  0xFF);
 */
+  pr_info("%s: %s() successfully finished\n", drv_name, __func__);
   return 0;
 }
 

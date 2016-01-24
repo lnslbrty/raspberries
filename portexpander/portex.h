@@ -46,14 +46,10 @@ enum MCP23S_REGS {
   MCP23S17_REG_INTCAP  = 0x18,
   MCP23S17_REG_GPIO    = 0x19,
   MCP23S17_REG_OLAT    = 0x1A,
+
+  REG_MAX // used for device cache, wasting 5 bytes
 };
 
-enum MCP23S_PORT {
-  /* MCP23S17 && MCP23S08 compatible */
-  MCP23S08_PORT = 0,
-  /* MCP23S17 ONLY */
-  MCP23S17_PORT = 1,
-};
 
 int portex_sysfs_init(void);
 
@@ -63,8 +59,8 @@ int portex_spi_init(void);
 
 void portex_spi_free(void);
 
-void portex_write_cached(enum MCP23S_PORT port, u8 pin_mask, u8 value);
+void portex_write_cached(enum MCP23S_REGS port, u8 pin_mask, u8 value);
 
-int portex_read_cached(enum MCP23S_PORT port, u8 pin_mask);
+int portex_read_cached(enum MCP23S_REGS port, u8 pin_mask);
 
 #endif
