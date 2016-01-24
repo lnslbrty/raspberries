@@ -2,10 +2,11 @@
 
 import sys
 import time
+import random
 
 
 SYSFS_PREFIX="/sys/class/portex"
-GPIO_COUNT=4
+GPIO_COUNT=6
 GPIO_PER_PORT=8
 GPIOA_FDS=list()
 GPIOB_FDS=list()
@@ -64,6 +65,19 @@ def blinkTest3(speed, extra):
 		if extra is False:
 			ledoutp(i,0,False)
 
+def blinkTest4(speed, count):
+	for i in range(count):
+		pin = int((random.random() * 16) % GPIO_COUNT)
+		prt = int((random.random() * 8) % 2)
+		if prt == 0:
+			use_port = False
+		else:
+			use_port = True
+		ledoutp(pin,1,use_port)
+		time.sleep(speed)
+		ledoutp(pin,0,use_port)
+		time.sleep(speed*5/3)
+
 def GPIOinit():
 	print 'GPIOinit'
 	for i in range(GPIO_COUNT):
@@ -91,21 +105,28 @@ fd.flush()
 time.sleep(0.5)
 
 GPIOinit()
+count=0
 try:
 	while True:
-		blinkTest0(0.2)
+		for i in range(3):
+			blinkTest0(0.1)
 		for i in range(3):
 			blinkTest1(0.1)
-		blinkTest2(0.2)
+		for i in range(2):
+			blinkTest2(0.2)
 		for i in range(5):
 			blinkTest2(0.05)
 			blinkTest2(0.05)
 		for i in range(5):
 			blinkTest3(0.05, True)
 			blinkTest3(0.05, False)
-		for i in range(5):
+		for i in range(10):
 			blinkTest3(0.05, False)
-		print 'next'
+		for i in range(5):
+			blinkTest4(0.075/(i+1), 50)
+		print '[' + str(count) + ']',
+		count += 1
+		sys.stdout.flush()
 except KeyboardInterrupt:
 	GPIOfree()
 	fd.write("0")
