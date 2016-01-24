@@ -3,16 +3,21 @@
 
 #include <linux/printk.h>
 
+#define DRIVER_NAME "portex"
 
-#define PRINTP "portex: "
-static const char prefix[] = PRINTP;
-#define INFO(fmt, ...) printk(KERN_INFO "%s" fmt "\n", prefix, __VA_ARGS__)
 
 enum MCP23S_ADDR {
-  MCP23S_ADDR_00 = 0x0,
-  MCP23S_ADDR_01 = 0x2,
-  MCP23S_ADDR_02 = 0x4,
-  MCP23S_ADDR_03 = 0x6,
+  /* MCP23S17 && MCP23S08 compatible */
+  MCP23S08_ADDR_00 = 0x0,
+  MCP23S08_ADDR_01 = 0x2,
+  MCP23S08_ADDR_02 = 0x4,
+  MCP23S08_ADDR_03 = 0x6,
+
+  /* MCP23S17 ONLY */
+  MCP23S17_ADDR_00 = 0x8,
+  MCP23S17_ADDR_01 = 0xA,
+  MCP23S17_ADDR_02 = 0xC,
+  MCP23S17_ADDR_03 = 0xE,
 };
 
 enum MCP23S_REGS {
@@ -43,6 +48,12 @@ enum MCP23S_REGS {
   MCP23S17_REG_OLAT    = 0x1A,
 };
 
+enum MCP23S_PORT {
+  /* MCP23S17 && MCP23S08 compatible */
+  MCP23S08_PORT = 0,
+  /* MCP23S17 ONLY */
+  MCP23S17_PORT = 1,
+};
 
 int portex_sysfs_init(void);
 
@@ -51,5 +62,9 @@ void portex_sysfs_free(void);
 int portex_spi_init(void);
 
 void portex_spi_free(void);
+
+void portex_write_cached(enum MCP23S_PORT port, u8 pin_mask, u8 value);
+
+int portex_read_cached(enum MCP23S_PORT port, u8 pin_mask);
 
 #endif

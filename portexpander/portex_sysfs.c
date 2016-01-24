@@ -13,47 +13,77 @@
 #include "portex.h"
 
 
-// Store and Show functions……
-static ssize_t attr1_store(struct class *cls, struct class_attribute *attr, const char *buf, size_t count);
-static ssize_t attr1_show(struct class *cls, struct class_attribute *attr, char *buf);
+static ssize_t gpio_set(struct class *cls, struct class_attribute *attr, const char *buf, size_t count);
+static ssize_t gpio_get(struct class *cls, struct class_attribute *attr, char *buf);
+static ssize_t gpio_dir_set(struct class *cls, struct class_attribute *attr, const char *buf, size_t count);
+static ssize_t gpio_dir_get(struct class *cls, struct class_attribute *attr, char *buf);
 
-// Attributes declaration: Here I have declared only one attribute attr1
-static struct class_attribute pwm_class_attrs[] = {
-  __ATTR(attr1, S_IRUGO | S_IWUSR , attr1_show, attr1_store), // use macro for permission
+
+#define GPIO(name) \
+   __ATTR(gpio ## name,         S_IRUGO | S_IWUSR , gpio_get,     gpio_set), \
+   __ATTR(gpio ## name ## _dir, S_IRUGO | S_IWUSR , gpio_dir_get, gpio_dir_set)
+static struct class_attribute portex_class_attrs[] = {
+  GPIO(0), GPIO(1), GPIO(2),  GPIO(3),  GPIO(4),  GPIO(5),  GPIO(6),  GPIO(7),
+  GPIO(8), GPIO(9), GPIO(10), GPIO(11), GPIO(12), GPIO(13), GPIO(14), GPIO(15),
   __ATTR_NULL
 };
 
-//Struct class is basic struct needed to create classs attributes.”dev_jes” is the directory under /sys/class.
-static struct class pwm_class =
+static struct class portex_class =
 {
-  .name = "portex",
+  .name = DRIVER_NAME,
   .owner = THIS_MODULE,
-  .class_attrs = pwm_class_attrs
+  .class_attrs = portex_class_attrs
 };
 
+#define MAX_GPIO 16
+static unsigned int gpio_values[MAX_GPIO];
 static unsigned int test = 0;
 
-
-// class attribute show function.
-static ssize_t attr1_show(struct class *cls, struct class_attribute *attr, char *buf)
+static unsigned int get_gpio_pin(struct class_attribute *a)
 {
+  unsigned int idx;
+  sscanf(a->attr.name, "gpio%u", &idx);
+  return idx;
+}
+
+static unsigned int encode_gpio_pin(unsigned int pin)
+{
+  if (pin > 7)
+    pin -= 8;
+  return (0x01 << pin);
+}
+
+static ssize_t gpio_get(struct class *cls, struct class_attribute *attr, char *buf)
+{
+  printk("get....: %u\n", get_gpio_pin(attr));
+  printk("encode.: %u\n", encode_gpio_pin(get_gpio_pin(attr)));
   return sprintf(buf, "%u\n", test);
 }
 
-// class attribute store function
-static ssize_t attr1_store(struct class *cls, struct class_attribute *attr, const char *buf, size_t count)
+static ssize_t gpio_set(struct class *cls, struct class_attribute *attr, const char *buf, size_t count)
 {
   sscanf(buf, "%u", &test);
   return count;
 }
 
+/* TODO: gpio direction ( IN <---> OUT ) */
+static ssize_t gpio_dir_set(struct class *cls, struct class_attribute *attr, const char *buf, size_t count)
+{
+  return 0;
+}
+
+static ssize_t gpio_dir_get(struct class *cls, struct class_attribute *attr, char *buf)
+{
+  return 0;
+}
+
 int portex_sysfs_init(void)
 {
-  class_register(&pwm_class);
+  class_register(&portex_class);
   return 0;
 }
 
 void portex_sysfs_free(void)
 {
-  class_unregister(&pwm_class);
+  class_unregister(&portex_class);
 }

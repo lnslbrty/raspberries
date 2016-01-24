@@ -10,11 +10,14 @@
 
 #include "portex.h"
 
-#define DRIVER_NAME "mcp23s17"
-
 
 static const char *drv_name = DRIVER_NAME;
+
+/* TODO: support more than one device */
+
+/* per device declarations */
 static struct spi_device *spi_mcp23s17 = NULL;
+static u8 cache_mcp23s17[2]; // per port cache
 
 /* function prototypes */
 static int mcp23s17_probe(struct spi_device *spi);
@@ -47,41 +50,63 @@ static int mcp23s17_read(enum MCP23S_ADDR addr, enum MCP23S_REGS reg)
   int ret;
   u8 tx[2], rx[2];
 
-  tx[0] = 0x41 | addr; // datasheet: controlbyte: 01000 A1 A0 1
+  tx[0] = 0x41 | addr; // datasheet: controlbyte: 0100 (A2) A1 A0 1
   tx[1] = reg;
   ret = spi_write_then_read(spi_mcp23s17, &tx[0], sizeof(tx), &rx[0], sizeof(rx));
-  return (ret < 0 ? ret : rx[0] | rx[1] << 8);
+  return (ret < 0 ? ret : rx[1] | rx[0] << 8);
 }
 
 static int mcp23s17_write(enum MCP23S_ADDR addr, enum MCP23S_REGS reg, u8 value)
 {
   u8 tx[3];
 
-  tx[0] = 0x40 | addr; // datasheet: controlbyte: 01000 A1 A0 0
+  tx[0] = 0x40 | addr; // datasheet: controlbyte: 0100 (A2) A1 A0 0
   tx[1] = reg;
   tx[2] = value;
   return spi_write(spi_mcp23s17, &tx[0], sizeof(tx));
+}
+
+void portex_write_cached(enum MCP23S_PORT port, u8 pin_mask, u8 value)
+{
+  if (!value) {
+    cache_mcp23s17[port] &= ~pin_mask;
+  } else {
+    cache_mcp23s17[port] |= pin_mask;
+  }
+  mcp23s17_write(MCP23S08_ADDR_00,
+                 (port == MCP23S17_PORT ? MCP23S17_REG_GPIO : MCP23S08_REG_GPIO),
+                 cache_mcp23s17[port]);
+}
+
+int portex_read_cached(enum MCP23S_PORT port, u8 pin_mask)
+{
+  cache_mcp23s17[port] = (mcp23s17_read(MCP23S08_ADDR_00,
+                                        (port == MCP23S17_PORT ? MCP23S17_REG_GPIO : MCP23S08_REG_GPIO)
+                                       ) & 0xFF);
+  return (cache_mcp23s17[port] & pin_mask) >> pin_mask;
 }
 
 static int mcp23s17_probe(struct spi_device *spi)
 {
   pr_info("%s: %s()\n", drv_name, __func__);
 
-  if (mcp23s17_read(MCP23S_ADDR_00, MCP23S08_REG_IODIR) != 0xFFFF) {
+  if (mcp23s17_read(MCP23S08_ADDR_00, MCP23S08_REG_IODIR) != 0xFFFF) {
     return -ENODEV;
   }
-  if (mcp23s17_read(MCP23S_ADDR_00, MCP23S17_REG_IODIR) != 0xFFFF) {
+  if (mcp23s17_read(MCP23S08_ADDR_00, MCP23S17_REG_IODIR) != 0xFFFF) {
     return -ENODEV;
   }
-
-  mcp23s17_write(MCP23S_ADDR_00, MCP23S08_REG_IODIR, 0x00);
-  mcp23s17_write(MCP23S_ADDR_00, MCP23S08_REG_GPIO,  0xFF);
-  mcp23s17_write(MCP23S_ADDR_00, MCP23S17_REG_IODIR, 0x00);
-  mcp23s17_write(MCP23S_ADDR_00, MCP23S17_REG_GPIO,  0xFF);
-
+/*
+  // debug stuff
+  mcp23s17_write(MCP23S08_ADDR_00, MCP23S08_REG_IODIR, 0x00);
+  mcp23s17_write(MCP23S08_ADDR_00, MCP23S08_REG_GPIO,  0xFF);
+  mcp23s17_write(MCP23S08_ADDR_00, MCP23S17_REG_IODIR, 0x00);
+  mcp23s17_write(MCP23S08_ADDR_00, MCP23S17_REG_GPIO,  0xFF);
+*/
   return 0;
 }
 
+/* TODO: on remove */
 static int mcp23s17_remove(struct spi_device *spi)
 {
   dev_dbg(&spi->dev, "%s()\n", __func__);
@@ -97,7 +122,7 @@ static void spidevices_delete(struct spi_master *master, unsigned cs)
 
   dev = bus_find_device_by_name(&spi_bus_type, NULL, str);
   if (dev) {
-    pr_err("%s: Deleting %s\n", drv_name, str);
+    pr_warn("%s: deleting %s\n", drv_name, str);
     device_del(dev);
   }
 }
@@ -132,10 +157,10 @@ void portex_spi_free(void)
   pr_info("%s: %s()\n", drv_name, __func__);
 
   /* restore default IODIR/GPIO values */
-  mcp23s17_write(MCP23S_ADDR_00, MCP23S08_REG_GPIO,  0x00);
-  mcp23s17_write(MCP23S_ADDR_00, MCP23S08_REG_IODIR, 0xFF);
-  mcp23s17_write(MCP23S_ADDR_00, MCP23S17_REG_GPIO,  0x00);
-  mcp23s17_write(MCP23S_ADDR_00, MCP23S17_REG_IODIR, 0xFF);
+  mcp23s17_write(MCP23S08_ADDR_00, MCP23S08_REG_GPIO,  0x00);
+  mcp23s17_write(MCP23S08_ADDR_00, MCP23S08_REG_IODIR, 0xFF);
+  mcp23s17_write(MCP23S08_ADDR_00, MCP23S17_REG_GPIO,  0x00);
+  mcp23s17_write(MCP23S08_ADDR_00, MCP23S17_REG_IODIR, 0xFF);
 
   spi_unregister_driver(&mcp23s17_driver);
   if (spi_mcp23s17) {

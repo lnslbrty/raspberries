@@ -17,18 +17,13 @@ MODULE_AUTHOR("Toni Uhlig, Eric Mueller");
 MODULE_DESCRIPTION("A GPIO based PortExpander for Linux");
 MODULE_VERSION("0.1");
 
-static s16 bus_num = 0;
-
-module_param(bus_num, short, 0);
-MODULE_PARM_DESC(bus_num, "MCP23S08 bus number");
-
 
 /* What should happen, when this module gets loaded? */
 static int __init pe_mod_init(void)
 {
   int ret;
 
-  INFO("%s", "init");
+  pr_info("%s: %s()\n", DRIVER_NAME, __func__);
   if ( (ret = portex_spi_init()) != 0 ) {
     return ret;
   }
@@ -41,9 +36,9 @@ static int __init pe_mod_init(void)
 /* What should happen, when this module gets unloaded? */
 static void __exit pe_mod_exit(void)
 {
+  pr_info("%s: %s()\n", DRIVER_NAME, __func__);
   portex_sysfs_free();
   portex_spi_free();
-  INFO("%s", "unloaded");
 }
 
 
