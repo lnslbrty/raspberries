@@ -66,20 +66,22 @@ static int mcp23s17_write(enum MCP23S_ADDR addr, enum MCP23S_REGS reg, u8 value)
   return spi_write(spi_mcp23s17, &tx[0], sizeof(tx));
 }
 
-void portex_write_cached(enum MCP23S_REGS port, u8 pin_mask, u8 value)
+/* TODO: maybe use async io? */
+void portex_write_cached(enum MCP23S_REGS reg, u8 pin_mask, u8 value)
 {
   if (!value) {
-    cache_mcp23s17[port] &= ~pin_mask;
+    cache_mcp23s17[reg] &= ~pin_mask;
   } else {
-    cache_mcp23s17[port] |= pin_mask;
+    cache_mcp23s17[reg] |= pin_mask;
   }
-  mcp23s17_write(MCP23S08_ADDR_00, port, cache_mcp23s17[port]);
+  mcp23s17_write(MCP23S08_ADDR_00, reg, cache_mcp23s17[reg]);
 }
 
-int portex_read_cached(enum MCP23S_REGS port, u8 pin_mask)
+/* TODO: Interrupt if pin direction is INPUT */
+int portex_read_cached(enum MCP23S_REGS reg, u8 pin_nmb)
 {
-  cache_mcp23s17[port] = (mcp23s17_read(MCP23S08_ADDR_00, port) & 0xFF);
-  return (cache_mcp23s17[port] & pin_mask) >> pin_mask;
+  //cache_mcp23s17[port] = (mcp23s17_read(MCP23S08_ADDR_00, port) & 0xFF);
+  return (cache_mcp23s17[reg] >> pin_nmb) & 0x1;
 }
 
 static int mcp23s17_probe(struct spi_device *spi)
@@ -97,20 +99,21 @@ static int mcp23s17_probe(struct spi_device *spi)
     return -ENODEV;
   }
   /* set all pins direction to out (TODO: sysfs should set the direction) */
+  /* TODO: initially read all registers? */
   mcp23s17_write(MCP23S08_ADDR_00, MCP23S08_REG_IODIR, 0x00);
-  portex_write_cached(MCP23S08_REG_GPIO, 0xFF, 1);
+  mcp23s17_write(MCP23S08_ADDR_00, MCP23S17_REG_IODIR, 0x00);
 /*
   // debug stuff
-  mcp23s17_write(MCP23S08_ADDR_00, MCP23S08_REG_IODIR, 0x00);
+  portex_write_cached(MCP23S08_REG_GPIO, 0x01, 1);
+  portex_write_cached(MCP23S17_REG_GPIO, 0x01, 1);
   mcp23s17_write(MCP23S08_ADDR_00, MCP23S08_REG_GPIO,  0xFF);
-  mcp23s17_write(MCP23S08_ADDR_00, MCP23S17_REG_IODIR, 0x00);
   mcp23s17_write(MCP23S08_ADDR_00, MCP23S17_REG_GPIO,  0xFF);
 */
   pr_info("%s: %s() successfully finished\n", drv_name, __func__);
   return 0;
 }
 
-/* TODO: on remove */
+/* TODO: on remove, something should happen here */
 static int mcp23s17_remove(struct spi_device *spi)
 {
   dev_dbg(&spi->dev, "%s()\n", __func__);

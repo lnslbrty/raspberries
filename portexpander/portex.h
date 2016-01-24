@@ -59,8 +59,8 @@ int portex_spi_init(void);
 
 void portex_spi_free(void);
 
-void portex_write_cached(enum MCP23S_REGS port, u8 pin_mask, u8 value);
+void portex_write_cached(enum MCP23S_REGS reg, u8 pin_nmb, u8 value);
 
-int portex_read_cached(enum MCP23S_REGS port, u8 pin_mask);
+int portex_read_cached(enum MCP23S_REGS reg, u8 pin_nmb);
 
 #endif
