@@ -1,15 +1,14 @@
 CC=gcc
 
 ifeq ($(DEBUG),1)
-GFLAGS=-g -D_NO_DEBUG=0
+GFLAGS=-g -D_DEBUG=1
 else
-GFLAGS=-fomit-frame-pointer -O2
+GFLAGS=-fomit-frame-pointer -O2 -U_DEBUG
 endif
 
-WINCLUDES?=.
-WLIBDIR?=.
-CFLAGS=$(GFLAGS) -Wall -fPIC
-LDFLAGS=-pthread -lwiringPi -lpcap -L/usr/local/lib
+_CFLAGS=$(CFLAGS) $(GFLAGS) -Wall -fPIC -pthread
+LIBS=-lpcap
+_LDFLAGS=$(LDFLAGS) $(LIBS) -L/usr/local/lib
 SOURCES=$(wildcard *.c)
 OBJECTS=$(patsubst %.c, %.o, $(SOURCES))
 DEPS=$(patsubst %.c, %.d, $(SOURCES))
@@ -24,11 +23,11 @@ clean:
 	-$(RM) $(ELFBIN)
 
 %.o: %.c
-	$(CC) -I$(WINCLUDES) $(CFLAGS) -c -o $@ $<
-	$(CC) -MM $(CFLAGS) $< > $(patsubst %.c, %.d, $<)
+	$(CC) $(_CFLAGS) -c -o $@ $<
+	$(CC) -MM $(_CFLAGS) $< > $(patsubst %.c, %.d, $<)
 
 $(ELFBIN): sniffer.o
-	$(CC) -L$(WLIBDIR) $(LDFLAGS) $+ -o $(ELFBIN)
+	$(CC) $(_CFLAGS) $(_LDFLAGS) $+ -o $(ELFBIN)
 	chmod +x $(ELFBIN)
 
 install: $(ELFBIN)
